@@ -1,0 +1,11 @@
+[package]
+name = "envsh"
+version = "0.1.0"
+authors = ["Jessica Rodriguez <dev@jessicarod.com>"]
+edition = "2024"
+description = "send and shorten stuff with envs.sh"
+
+[dependencies]
+clap = { version = "4.5.27", features = ["derive"] }
+jiff = { version = "0.1.28"}
+reqwest = { version = "0.12.12", features = ["multipart", "blocking"] }
