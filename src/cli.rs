@@ -1,15 +1,40 @@
 //! [`crate::Cli`] parsers
 
 use std::ffi::OsStr;
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use clap::builder::{NonEmptyStringValueParser, TypedValueParser};
-use clap::error::ErrorKind;
+use clap::error::{ContextKind, ContextValue, ErrorKind};
 use clap::{Arg, Command, Error, value_parser};
 use jiff::Timestamp;
 use reqwest::Url;
 
-use crate::Expiry;
+use crate::{Expiry, Target};
+
+/// Validates that either a valid file path or remote URL was provided
+#[derive(Clone)]
+pub(crate) struct TargetValueParser;
+
+impl TypedValueParser for TargetValueParser {
+    type Value = Target;
+
+    fn parse_ref(
+        &self,
+        cmd: &Command,
+        arg: Option<&Arg>,
+        value: &OsStr,
+    ) -> Result<Self::Value, Error> {
+        let target = NonEmptyStringValueParser::new().parse_ref(cmd, arg, value)?;
+        if Url::from_file_path(&target).is_ok() {
+            Ok(Target::File(PathBuf::from_str(&target).unwrap()))
+        } else {
+            Ok(Target::Url(
+                Url::from_str(&target).map_err(|e| Error::raw(ErrorKind::ValueValidation, e))?,
+            ))
+        }
+    }
+}
 
 /// Validates that the provided value is expiry time in hours, or a timestamp
 #[derive(Clone)]
@@ -52,11 +77,16 @@ impl TypedValueParser for EnvsUrlValueParser {
         if url.scheme() == "https" && url.domain() == Some("envs.sh") {
             Ok(url)
         } else {
-            Err(Error::raw(
-                ErrorKind::ValueValidation,
-                "url must start with \"https://envs.sh\"",
-            )
-            .with_cmd(cmd))
+            let mut err = Error::new(ErrorKind::ValueValidation);
+            err.insert(
+                ContextKind::InvalidValue,
+                ContextValue::String(url.to_string()),
+            );
+            err.insert(
+                ContextKind::Usage,
+                ContextValue::String("url must start with \"https://envs.sh\"".to_string()),
+            );
+            Err(err.with_cmd(cmd))
         }
     }
 }

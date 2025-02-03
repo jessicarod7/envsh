@@ -2,6 +2,7 @@
 #![deny(missing_docs)]
 #![deny(clippy::missing_docs_in_private_items)]
 
+use crate::cli::TargetValueParser;
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -26,8 +27,8 @@ const ENVS: &str = "https://envs.sh";
 #[derive(Debug, Parser)]
 #[command(author, about)]
 struct Cli {
-    /// The target to be processed
-    #[command(flatten)]
+    /// A file or URL to send to the URL host/shortener
+    #[arg(value_name = "FILE|URL", value_parser = TargetValueParser)]
     target: Target,
 
     /// Print X-Token (and expiry date)
@@ -37,7 +38,7 @@ struct Cli {
     /// Shorten a URL instead of sending the file it points to
     ///
     /// Will fail if used on a path
-    #[arg(short, long, requires = "url")]
+    #[arg(short, long)]
     shorten: bool,
 
     /// Make the resulting URL difficult to guess
@@ -54,15 +55,12 @@ struct Cli {
 }
 
 // A file or URL to send to the URL host/shortener
-#[derive(Clone, Debug, Args)]
-#[group(required = true)]
-struct Target {
-    /// Relative path to a file
-    #[arg(value_hint = ValueHint::FilePath)]
-    file: Option<PathBuf>,
-    /// Full remote URL
-    #[arg(value_hint = ValueHint::Url)]
-    url: Option<Url>,
+#[derive(Clone, Debug)]
+enum Target {
+    /// A local file path
+    File(PathBuf),
+    /// An external URL
+    Url(Url),
 }
 
 /// Manage files previously sent
@@ -129,13 +127,13 @@ fn main() {
 fn create_url(args: Cli) {
     let create_form = [
         // Build parts for form
-        match (args.target.url, args.shorten) {
-            (Some(url), false) => Some(("url", Part::text(url.to_string()))),
-            (Some(url), true) => Some(("shorten", Part::text(url.to_string()))),
-            (None, _) => Some((
-                "file",
-                Part::file(args.target.file.unwrap()).expect("failed to load file"),
-            )),
+        match (args.target, args.shorten) {
+            (Target::Url(url), false) => Some(("url", Part::text(url.to_string()))),
+            (Target::Url(url), true) => Some(("shorten", Part::text(url.to_string()))),
+            (Target::File(f), false) => Some(("file", Part::file(f).expect("failed to load file"))),
+            (Target::File(f), true) => {
+                panic!("--shorten cannot be used with file path {}", f.display())
+            }
         },
         args.secret.then_some(("secret", Part::text(""))),
         args.expires
