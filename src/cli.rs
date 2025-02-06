@@ -26,8 +26,8 @@ impl TypedValueParser for TargetValueParser {
         value: &OsStr,
     ) -> Result<Self::Value, Error> {
         let target = NonEmptyStringValueParser::new().parse_ref(cmd, arg, value)?;
-        if Url::from_file_path(&target).is_ok() {
-            Ok(Target::File(PathBuf::from_str(&target).unwrap()))
+        if let Some(path) = PathBuf::from_str(&target).ok().filter(|p| p.is_file()) {
+            Ok(Target::File(path))
         } else {
             Ok(Target::Url(
                 Url::from_str(&target).map_err(|e| Error::raw(ErrorKind::ValueValidation, e))?,

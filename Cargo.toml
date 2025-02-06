@@ -1,6 +1,6 @@
 [package]
 name = "envsh"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Jessica Rodriguez <dev@jessicarod.com>"]
 edition = "2024"
 description = "send and shorten stuff with envs.sh"
