@@ -28,8 +28,8 @@ const ENVS: &str = "https://envs.sh";
 #[command(author, about)]
 struct Cli {
     /// A file or URL to send to the URL host/shortener
-    #[arg(value_name = "FILE|URL", value_parser = TargetValueParser)]
-    target: Target,
+    #[arg(required = true, value_name = "FILE|URL", value_parser = TargetValueParser)]
+    target: Option<Target>,
 
     /// Print X-Token (and expiry date)
     #[arg(short, long, conflicts_with = "shorten")]
@@ -88,7 +88,7 @@ enum Manage {
 struct ManageOpts {
     /// Specify when the URL should expire, in hours or epoch milliseconds
     #[arg(short, long, value_parser = ExpiryValueParser)]
-    expires: Expiry,
+    expires: Option<Expiry>,
 
     /// Delete the shared URL immediately (requires `token`)
     #[arg(short, long)]
@@ -127,7 +127,7 @@ fn main() {
 fn create_url(args: Cli) {
     let create_form = [
         // Build parts for form
-        match (args.target, args.shorten) {
+        match (args.target.unwrap(), args.shorten) {
             (Target::Url(url), false) => Some(("url", Part::text(url.to_string()))),
             (Target::Url(url), true) => Some(("shorten", Part::text(url.to_string()))),
             (Target::File(f), false) => Some(("file", Part::file(f).expect("failed to load file"))),
@@ -196,7 +196,7 @@ fn manage_url(args: Manage) {
         if options.delete {
             ("delete", Part::text(""))
         } else {
-            ("expires", Part::text(options.expires.to_string()))
+            ("expires", Part::text(options.expires.unwrap().to_string()))
         },
     ]
     .into_iter()
