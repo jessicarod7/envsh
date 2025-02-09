@@ -49,7 +49,7 @@ struct Cli {
     #[arg(short, long, value_parser = ExpiryValueParser, value_name = "TIME")]
     expires: Option<Expiry>,
 
-    /// Modify an existing URL
+    /// Management subcommand
     #[command(subcommand)]
     manage: Option<Manage>,
 }
@@ -67,7 +67,7 @@ enum Target {
 #[derive(Clone, Debug, Subcommand)]
 #[command(args_conflicts_with_subcommands = true)]
 enum Manage {
-    /// One option lol
+    /// modify an existing submission
     Manage {
         /// Existing envs.sh URL
         #[arg(value_parser = EnvsUrlValueParser, value_hint = ValueHint::Url)]
