@@ -85,7 +85,7 @@ enum Subcommands {
     /// Generate shell completions
     ///
     /// Completions can be piped to their respective directories and sourced.
-    Generate {
+    Completion {
         /// The shell to generate completions for
         shell: Shell,
     },
@@ -137,7 +137,7 @@ fn main() {
             token,
             options,
         }) => manage_url(url, token, options),
-        Some(Subcommands::Generate { shell }) => generate_shell_completion(shell),
+        Some(Subcommands::Completion { shell }) => generate_shell_completion(shell),
         None => create_url(args),
     }
 }
@@ -240,7 +240,14 @@ fn generate_shell_completion(shell: Shell) {
 
     // Append fish options for generate subcommand
     if shell == Shell::Fish {
-        completion.extend(b"complete -c envsh -n \"__fish_envsh_using_subcommand generate\" -a 'bash elvish fish powershell zsh' -d 'The shell to generate completions for'\n")
+        completion.extend(
+            b"\
+            complete -c envsh -n \"__fish_envsh_using_subcommand completion\" -f -a 'bash'\n\
+            complete -c envsh -n \"__fish_envsh_using_subcommand completion\" -f -a 'elvish'\n\
+            complete -c envsh -n \"__fish_envsh_using_subcommand completion\" -f -a 'fish'\n\
+            complete -c envsh -n \"__fish_envsh_using_subcommand completion\" -f -a 'powershell'\n\
+            complete -c envsh -n \"__fish_envsh_using_subcommand completion\" -f -a 'zsh'",
+        )
     }
 
     io::stdout().write_all(&completion).unwrap()
