@@ -2,13 +2,15 @@
 #![deny(missing_docs)]
 #![deny(clippy::missing_docs_in_private_items)]
 
-use crate::cli::TargetValueParser;
 use std::fmt::{Display, Formatter};
+use std::io;
+use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 
 use clap::builder::ValueHint;
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, CommandFactory, Parser, Subcommand};
+use clap_complete::Shell;
 use jiff::{Timestamp, tz::TimeZone};
 use reqwest::Url;
 use reqwest::blocking::{
@@ -16,7 +18,7 @@ use reqwest::blocking::{
     multipart::{Form, Part},
 };
 
-use cli::{EnvsUrlValueParser, ExpiryValueParser};
+use cli::{EnvsUrlValueParser, ExpiryValueParser, TargetValueParser};
 
 mod cli;
 
@@ -49,9 +51,9 @@ struct Cli {
     #[arg(short, long, value_parser = ExpiryValueParser, value_name = "TIME")]
     expires: Option<Expiry>,
 
-    /// Management subcommand
+    /// Subcommands
     #[command(subcommand)]
-    manage: Option<Manage>,
+    subcom: Option<Subcommands>,
 }
 
 // A file or URL to send to the URL host/shortener
@@ -63,11 +65,11 @@ enum Target {
     Url(Url),
 }
 
-/// Manage files previously sent
+/// CLI subcommands
 #[derive(Clone, Debug, Subcommand)]
 #[command(args_conflicts_with_subcommands = true)]
-enum Manage {
-    /// modify an existing submission
+enum Subcommands {
+    /// Modify an existing submission
     Manage {
         /// Existing envs.sh URL
         #[arg(value_parser = EnvsUrlValueParser, value_hint = ValueHint::Url)]
@@ -79,6 +81,13 @@ enum Manage {
         /// Management options
         #[command(flatten)]
         options: ManageOpts,
+    },
+    /// Generate shell completions
+    ///
+    /// Completions can be piped to their respective directories and sourced.
+    Generate {
+        /// The shell to generate completions for
+        shell: Shell,
     },
 }
 
@@ -104,6 +113,11 @@ enum Expiry {
     Timestamp(Timestamp),
 }
 
+impl Expiry {
+    /// Maximum number of hours a file will be hosted
+    const MAX_EXPIRY_HOURS: i64 = 24 * 30;
+}
+
 impl Display for Expiry {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -117,8 +131,13 @@ impl Display for Expiry {
 fn main() {
     let args = Cli::parse();
 
-    match args.manage {
-        Some(manage_args) => manage_url(manage_args),
+    match args.subcom {
+        Some(Subcommands::Manage {
+            url,
+            token,
+            options,
+        }) => manage_url(url, token, options),
+        Some(Subcommands::Generate { shell }) => generate_shell_completion(shell),
         None => create_url(args),
     }
 }
@@ -127,11 +146,14 @@ fn main() {
 fn create_url(args: Cli) {
     let create_form = [
         // Build parts for form
-        match (args.target.unwrap(), args.shorten) {
-            (Target::Url(url), false) => Some(("url", Part::text(url.to_string()))),
-            (Target::Url(url), true) => Some(("shorten", Part::text(url.to_string()))),
-            (Target::File(f), false) => Some(("file", Part::file(f).expect("failed to load file"))),
-            (Target::File(f), true) => {
+        match (args.target.unwrap(), args.shorten, args.expires.is_some()) {
+            (Target::Url(url), false, false) => Some(("url", Part::text(url.to_string()))),
+            (Target::Url(url), true, false) => Some(("shorten", Part::text(url.to_string()))),
+            (Target::File(f), false, _) => {
+                Some(("file", Part::file(f).expect("failed to load file")))
+            }
+            (Target::Url(url), _, true) => panic!("--expires cannot be used with URL {url}"),
+            (Target::File(f), true, _) => {
                 panic!("--shorten cannot be used with file path {}", f.display())
             }
         },
@@ -182,15 +204,7 @@ fn create_url(args: Cli) {
 }
 
 /// Modify an existing URL
-fn manage_url(args: Manage) {
-    let (url, token, options) = match args {
-        Manage::Manage {
-            url,
-            token,
-            options,
-        } => (url, token, options),
-    };
-
+fn manage_url(url: Url, token: String, options: ManageOpts) {
     let manage_form = [
         ("token", Part::text(token)),
         if options.delete {
@@ -217,4 +231,17 @@ fn manage_url(args: Manage) {
             manage_resp.text().unwrap()
         )
     }
+}
+
+/// Generate shell completions, adding options for Fish
+fn generate_shell_completion(shell: Shell) {
+    let mut completion: Vec<u8> = vec![];
+    clap_complete::generate(shell, &mut Cli::command(), "envsh", &mut completion);
+
+    // Append fish options for generate subcommand
+    if shell == Shell::Fish {
+        completion.extend(b"complete -c envsh -n \"__fish_envsh_using_subcommand generate\" -a 'bash elvish fish powershell zsh' -d 'The shell to generate completions for'\n")
+    }
+
+    io::stdout().write_all(&completion).unwrap()
 }

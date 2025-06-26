@@ -51,10 +51,13 @@ impl TypedValueParser for ExpiryValueParser {
     ) -> Result<Self::Value, Error> {
         let expiry = value_parser!(i64).parse_ref(cmd, arg, value)?;
 
-        Ok(match Timestamp::from_millisecond(expiry) {
-            Ok(ts) => Expiry::Timestamp(ts),
-            Err(_) => Expiry::Hours(expiry),
-        })
+        if expiry <= Expiry::MAX_EXPIRY_HOURS {
+            Ok(Expiry::Hours(expiry))
+        } else {
+            Ok(Expiry::Timestamp(
+                Timestamp::from_millisecond(expiry).expect("invalid timestamp"),
+            ))
+        }
     }
 }
 
