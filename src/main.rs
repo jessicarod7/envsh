@@ -27,7 +27,7 @@ const ENVS: &str = "https://envs.sh";
 
 /// Root command options
 #[derive(Debug, Parser)]
-#[command(author, about)]
+#[command(about, version)]
 struct Cli {
     /// A file or URL to send to the URL host/shortener
     #[arg(required = true, value_name = "FILE|URL", value_parser = TargetValueParser)]
