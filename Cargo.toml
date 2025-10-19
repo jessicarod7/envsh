@@ -1,6 +1,6 @@
 [package]
 name = "envsh"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Jessica Rodriguez <dev@jessicarod.com>"]
 categories = ["command-line-utilities"]
 edition = "2024"
@@ -12,7 +12,7 @@ readme = "README.md"
 description = "send and shorten stuff with envs.sh"
 
 [dependencies]
-clap = { version = "4.5.40", features = ["derive", "error-context"] }
-clap_complete = "4.5.54"
+clap = { version = "4.5.49", features = ["derive", "error-context"] }
+clap_complete = "4.5.59"
 jiff = { version = "0.2.15" }
-reqwest = { version = "0.12.20", features = ["multipart", "blocking"] }
+reqwest = { version = "0.12.24", features = ["multipart", "blocking"] }
